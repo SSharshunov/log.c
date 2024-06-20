@@ -49,21 +49,30 @@ static const char *level_colors[] = {
 };
 #endif
 
+#define ANSI_COLOR_RESET   "\x1b[0m"
 
 static void stdout_callback(log_Event *ev) {
   char buf[16];
   buf[strftime(buf, sizeof(buf), "%H:%M:%S", ev->time)] = '\0';
 #ifdef LOG_USE_COLOR
   fprintf(
-    ev->udata, "%s %s%-5s\x1b[0m \x1b[90m%s:%d:\x1b[0m ",
+    ev->udata, "%s  %s<%-5s>\x1b[0m \x1b[90m%30s@\x1b[0m%-5d\x1b[90m [%25s] \x1b[0m ",
     buf, level_colors[ev->level], level_strings[ev->level],
-    ev->file, ev->line);
+    ev->file, ev->line, ev->function);
 #else
   fprintf(
-    ev->udata, "%s %-5s %s:%d: ",
+    ev->udata, "%s %-5s %30s:%-5d: ",
     buf, level_strings[ev->level], ev->file, ev->line);
 #endif
+#ifdef LOG_USE_COLOR
+  char tmp[1000] = {0};
+  strcat(tmp, level_colors[ev->level]);
+  strcat(tmp, ev->fmt);
+  strcat(tmp, ANSI_COLOR_RESET);
+  vfprintf(ev->udata, tmp, ev->ap);
+#else
   vfprintf(ev->udata, ev->fmt, ev->ap);
+#endif
   fprintf(ev->udata, "\n");
   fflush(ev->udata);
 }
@@ -137,11 +146,12 @@ static void init_event(log_Event *ev, void *udata) {
 }
 
 
-void log_log(int level, const char *file, int line, const char *fmt, ...) {
+void log_log(int level, const char *file, int line, const char *function, const char *fmt, ...) {
   log_Event ev = {
     .fmt   = fmt,
     .file  = file,
     .line  = line,
+    .function  = function,
     .level = level,
   };
 
